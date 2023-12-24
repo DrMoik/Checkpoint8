@@ -1,9 +1,32 @@
-# The rb1_ros2_description package
+Starting the Simulation
+To launch the RB1 robot simulation:
 
-This package contains a ROS2 robot model description for Robotnik's RB-1 mobile base.   
+Use the following command to start the simulation environment:
 
-## Disclaimer:  
-This package only modifies/adapts files from these repositories/packages:  
-- [RobotnikAutomation/rb1_base_sim](https://github.com/RobotnikAutomation/rb1_base_sim) licensed under the BSD 2-Clause "Simplified" License
-- [RobotnikAutomation/rb1_base_common/rb1_base_description](https://github.com/RobotnikAutomation/rb1_base_common/tree/melodic-devel/rb1_base_description), licensed under the BSD License
-- [RobotnikAutomation/robotnik_sensors],(https://github.com/RobotnikAutomation/robotnik_sensors) licensed under the BSD License
+
+ros2 launch rb1_ros2_description rb1_ros2_lift_xacro.launch.py
+
+
+This will initialize the robot model and controllers in Gazebo.
+
+Verify that the necessary topics are active by running:
+
+
+ros2 topic list
+
+
+You should see topics such as /lift_controller/commands, /joint_states, /odom, and others.
+
+Controller Activation
+The launch file should automatically activate the necessary controllers. 
+
+Move the lifting unit up:
+ros2 topic pub /lift_controller/commands std_msgs/msg/Float64MultiArray "data: [10]" -1
+
+
+Move the lifting unit down:
+ros2 topic pub /lift_controller/commands std_msgs/msg/Float64MultiArray "data: [0]" -1
+
+
+These commands will elevate or lower the robot's lifting unit, respectively.
+

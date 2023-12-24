@@ -20,6 +20,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(realtime_tools REQUIRED)
 find_package(example_interfaces REQUIRED)
+find_package(control_toolbox REQUIRED) 
 
 add_library(
   lift_controller
@@ -41,6 +42,7 @@ ament_target_dependencies(
   rclcpp
   rclcpp_lifecycle
   realtime_tools
+  control_toolbox
 )
 # prevent pluginlib from using boost
 target_compile_definitions(lift_controller PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")

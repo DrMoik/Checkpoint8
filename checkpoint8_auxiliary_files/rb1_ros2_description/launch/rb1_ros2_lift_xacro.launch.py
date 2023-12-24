@@ -60,14 +60,15 @@ def generate_launch_description():
     robot_name_1 = "rb1_robot"
 
     rsp_robot1 = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        #name='robot_state_publisher',
-        #namespace=robot_name_1,
-        parameters=[{'frame_prefix': robot_name_1+'/', 'use_sim_time': use_sim_time,
-                     'robot_description': ParameterValue(Command(['xacro ', robot_desc_path, ' robot_name:=', robot_name_1]), value_type=str)}],
-        output="screen"
-    )
+    package='robot_state_publisher',
+    executable='robot_state_publisher',
+    parameters=[{'frame_prefix': robot_name_1+'/', 'use_sim_time': use_sim_time,
+                 'robot_description': ParameterValue(Command([
+                     'xacro ', robot_desc_path, 
+                     ' robot_name:=', robot_name_1,
+                     ' control_plugin:=lift']), value_type=str)}],
+    output="screen"
+)
 
     spawn_robot1 = Node(
         package='gazebo_ros',
@@ -89,6 +90,12 @@ def generate_launch_description():
         executable="spawner",
         arguments=["rb1_base_controller", "-c", "/controller_manager"],
     )
+
+    robot_controller_spawner2 = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["lift_controller", "-c", "/controller_manager"],
+    )
     
 
     return LaunchDescription([
@@ -102,6 +109,12 @@ def generate_launch_description():
             event_handler=OnProcessExit(
                 target_action=joint_state_broadcaster_spawner,
                 on_exit=[robot_controller_spawner],
+            )
+        ),
+        RegisterEventHandler(
+            event_handler=OnProcessExit(
+                target_action=robot_controller_spawner,
+                on_exit=[robot_controller_spawner2],
             )
         ),
         gazebo,

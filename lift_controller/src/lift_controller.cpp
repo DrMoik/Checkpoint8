@@ -1,21 +1,9 @@
-// Copyright (c) 2021, Bence Magyar and Denis Stogl
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
 
 #include "lift_controller/lift_controller.hpp"
-
+#include <control_toolbox/pid_ros.hpp>
 #include <limits>
 #include <memory>
+#include <pluginlib/class_list_macros.hpp>
 #include <string>
 #include <vector>
 
@@ -23,8 +11,6 @@ namespace lift_controller {
 LiftController::LiftController()
     : controller_interface::ControllerInterface() {}
 
-// All the methods added must be inside this namespace
-///////////////// ON_INIT() METHOD///////////////////////////////////////
 CallbackReturn LiftController::on_init() {
   try {
     auto_declare("joints", std::vector<std::string>());
@@ -66,16 +52,19 @@ CallbackReturn LiftController::on_configure(
     return CallbackReturn::ERROR;
   }
 
+  // Initialize PID controllers here
+  initializePidControllers();
+
   // Command Subscriber and callbacks
   auto callback_command =
       [&](const std::shared_ptr<ControllerCommandMsg> msg) -> void {
     if (msg->joint_names.size() == joint_names_.size()) {
       input_command_.writeFromNonRT(msg);
     } else {
-      RCLCPP_ERROR(get_node()->get_logger(),
-                   "Received %zu , but expected %zu joints in command. "
-                   "Ignoring message.",
-                   msg->joint_names.size(), joint_names_.size());
+      RCLCPP_ERROR(
+          get_node()->get_logger(),
+          "Received %zu, but expected %zu joints in command. Ignoring message.",
+          msg->joint_names.size(), joint_names_.size());
     }
   };
   command_subscriber_ = get_node()->create_subscription<ControllerCommandMsg>(
@@ -90,9 +79,23 @@ CallbackReturn LiftController::on_configure(
   state_publisher_->msg_.header.frame_id = joint_names_[0];
   state_publisher_->unlock();
 
-  RCLCPP_INFO_STREAM(get_node()->get_logger(), "configure successful");
+  RCLCPP_INFO_STREAM(get_node()->get_logger(), "Configuration successful");
   return CallbackReturn::SUCCESS;
 }
+//////////////
+void LiftController::initializePidControllers() {
+    pid_controllers_.clear();
+    for (size_t i = 0; i < joint_names_.size(); ++i) {
+        control_toolbox::PidROS pid(get_node()->get_node_base_interface(),
+                                    get_node()->get_node_logging_interface(),
+                                    get_node()->get_node_parameters_interface(),
+                                    get_node()->get_node_topics_interface(),
+                                    "pid_" + joint_names_[i]); // Adjust prefix as needed
+        pid.initPid(1.0, 0.0, 0.0, 1.0, -1.0, true); // Example PID gains with antiwindup
+        pid_controllers_.push_back(pid);
+    }
+}
+
 ////////////////////COMMAND_INTERFACE_CONFIGURATION() METHOD///////////////////
 
 controller_interface::InterfaceConfiguration
@@ -169,25 +172,36 @@ CallbackReturn LiftController::on_deactivate(
 ////////////////////UPDATE() METHOD ////////////////
 controller_interface::return_type
 LiftController::update(const rclcpp::Time &time,
-                       const rclcpp::Duration & /*period*/) {
+                       const rclcpp::Duration &period) {
   auto current_command = input_command_.readFromRT();
 
+  // Read actual joint positions from the state interfaces
+  for (size_t i = 0; i < current_positions_.size(); ++i) {
+    // Assuming the state interfaces are set up and ordered correctly
+    current_positions_[i] = state_interfaces_[i].get_value();
+  }
+
+  // Compute and apply control effort using PID controllers
   for (size_t i = 0; i < command_interfaces_.size(); ++i) {
     if (!std::isnan((*current_command)->displacements[i])) {
-      command_interfaces_[i].set_value((*current_command)->displacements[i]);
+      double error =
+          (*current_command)->displacements[i] - current_positions_[i];
+      double command_effort = pid_controllers_[i].computeCommand(error, period);
+      command_interfaces_[i].set_value(command_effort);
     }
   }
 
+  // Update the state publisher with the new data
   if (state_publisher_ && state_publisher_->trylock()) {
     state_publisher_->msg_.header.stamp = time;
-    state_publisher_->msg_.set_point = command_interfaces_[0].get_value();
-
+    state_publisher_->msg_.set_point =
+        (*current_command)->displacements[0]; // Example for the first joint
+    // Add more information to the state message as needed
     state_publisher_->unlockAndPublish();
   }
 
   return controller_interface::return_type::OK;
 }
-
 } // namespace lift_controller
 
 #include "pluginlib/class_list_macros.hpp"

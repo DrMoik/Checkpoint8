@@ -8,7 +8,9 @@ controller_manager:
       type: joint_state_broadcaster/JointStateBroadcaster
 
     lift_controller:
-      type: lift_controller/LiftController
+      #type: lift_controller/LiftController
+      type: effort_controllers/JointGroupEffortController
+
 
     rb1_base_controller:
       type: diff_drive_controller/DiffDriveController
@@ -17,8 +19,15 @@ controller_manager:
 lift_controller:
   ros__parameters:
     joints:
-      -robot_elevator_platform_joint
-    interface_name: position
+      - robot_elevator_platform_joint
+    command_interfaces:
+      - effort
+    state_interfaces:
+      - position
+      - velocity
+      - effort
+  
+  
 
 rb1_base_controller:
   ros__parameters:
