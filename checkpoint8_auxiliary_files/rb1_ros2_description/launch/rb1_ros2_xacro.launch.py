@@ -92,6 +92,9 @@ def generate_launch_description():
     
 
     return LaunchDescription([
+        gazebo,
+      rsp_robot1,
+       spawn_robot1,
        RegisterEventHandler(
             event_handler=OnProcessExit(
                 target_action=spawn_robot1,
@@ -104,7 +107,5 @@ def generate_launch_description():
                 on_exit=[robot_controller_spawner],
             )
         ),
-        gazebo,
-        rsp_robot1,
-        spawn_robot1,
+        
     ])
